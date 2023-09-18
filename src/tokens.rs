@@ -16,6 +16,11 @@ pub enum Token {
     KwNull,
     KwConst,
     KwVar,
+    KwAnd,
+    KwOr,
+    KwAdd,
+    KwTrue,
+    KwFalse,
 
     Newline,
     Comma,
@@ -32,6 +37,7 @@ pub enum Token {
     SemiColon,
     Colon,
     Underscore,
+    Question,
     SingleQuote,
     DoubleQuote,
     Delim,
@@ -72,6 +78,10 @@ impl FromStr for Token {
             "null" => Ok(Token::KwNull),
             "const" => Ok(Token::KwConst),
             "var" => Ok(Token::KwVar),
+            "and" => Ok(Token::KwAnd),
+            "or" => Ok(Token::KwOr),
+            "true" => Ok(Token::KwTrue),
+            "false" => Ok(Token::KwFalse),
             _ => Err(s.to_string())
         }
     }

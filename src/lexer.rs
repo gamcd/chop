@@ -1,3 +1,4 @@
+use std::fmt::format;
 use std::io::{BufRead, BufReader};
 use std::fs::File;
 use std::str::FromStr;
@@ -39,7 +40,7 @@ impl Lexer {
 
 
         let c: char = self.stream[self.line][self.column] as char;
-        println!("Char:  {} , Line:  {} , Column:  {} , Depth:  {} ", c, self.line, self.column, self.depth);
+        // println!("Char:  {} , Line:  {} , Column:  {} , Depth:  {} ", c, self.line, self.column, self.depth);
         self.column += 1;
         Some(c)
     }
@@ -52,35 +53,26 @@ impl Lexer {
         }
     }
 
-    fn peek_past(&self, n: usize) -> Option<char> {
-        if self.stream.len() == self.line as usize || self.stream[self.line].len() == self.column {
-            None
-        } else {
-            self.stream[self.line].get(self.column + n).map(|c| *c as char)
-        }
-    }
-
-    pub(crate) fn lex(mut self) -> (Vec<Token>, Vec<String>) {
+    pub(crate) fn lex(mut self) -> (Vec<(Token, usize, usize)>, Vec<String>) {
         let mut error_list: Vec<String> = Vec::new();
-        let mut token_list: Vec<Token> = Vec::new();
+        let mut token_list: Vec<(Token, usize, usize)> = Vec::new();
 
         while let Some(c) = self.next() {
 
             match self.match_chars(c) {
                 Ok(t) =>
-                    token_list.push(t),
+                    token_list.push((t, self.line, self.column)),
                 Err(e)  =>
                     error_list.push(e.to_owned())
             }
         }
-        token_list.push(Token::EOF);
+        token_list.push((Token::EOF, self.line, self.column));
 
         return (token_list, error_list)
     }
 
     fn match_chars(&mut self, c: char) -> Result<Token, String> {
 
-        let next = self.peek();
         match c {
             '\n' => return Ok(Token::Newline),
             '\'' => return Ok(Token::SingleQuote),
@@ -109,6 +101,7 @@ impl Lexer {
             '>' => return Ok(Token::GT),
             '@' => return Ok(Token::At),
             '_' => return Ok(Token::Underscore),
+            '?' => return Ok(Token::Question),
             '{' => {self.depth += 1; return Ok(Token::LBrace)},
             '}' => {self.depth -= 1; return Ok(Token::RBrace)},
             '!' => { if let Some('=') = self.peek() {self.column += 1; Ok(Token::BangEq)} else {Ok(Token::Bang)}},
@@ -129,18 +122,16 @@ impl Lexer {
             'a'..='z' | 'A'..='Z' => {
                 let mut ident = c.to_string();
 
-                loop {
-                    if let Some(new_char) = self.next() {
-                        match new_char {
-                            'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '-' => { ident.push(new_char) }
-                            ' ' | '\n' | '(' | ')' | '.' | '{' | '}' | ':' | '<' | '>' | '[' | ']' => {
-                                if self.column != 0 {
-                                    self.column -= 1;
-                                }
-                                break;
+                while let Some(new_char) = self.next() {
+                    match new_char {
+                        'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '-' => { ident.push(new_char) }
+                        ' ' | '\n' | '(' | ')' | '.' | '{' | '}' | ':' | '<' | '>' | '[' | ']' => {
+                            if self.column != 0 {
+                                self.column -= 1;
                             }
-                            _ => {return Err(format!("Illegal Identifier character: \'{}\'", &new_char));}
-                        }
+                            break;
+                        },
+                        _ => { return Err(format!("Illegal Identifier character: \'{}\'", &new_char)); }
                     }
                 }
 
@@ -158,7 +149,15 @@ impl Lexer {
                     if let Some(new_char) = self.next() {
                         match new_char {
                             '0'..='9' => { num_lit.push(new_char)},
-                            '.' => {num_lit.push(new_char); floating = true;}
+                            '_' => {},
+                            '.' => {
+                                num_lit.push(new_char);
+                                floating = true;
+                                match self.peek().unwrap() {
+                                    '0'..='9' => {},
+                                    _ => {return Err(format!("Float cannot end in '.' {}:{}", self.line, self.column))},
+                                }
+                            }
                             _ => {break}
                         }
                     }

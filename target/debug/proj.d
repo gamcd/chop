@@ -1,1 +1,1 @@
-/home/gavin/dev/draft/proj/target/debug/proj: /home/gavin/dev/draft/proj/src/lexer.rs /home/gavin/dev/draft/proj/src/main.rs /home/gavin/dev/draft/proj/src/tokens.rs
+/home/gavin/dev/chop/target/debug/proj: /home/gavin/dev/chop/src/lexer.rs /home/gavin/dev/chop/src/main.rs /home/gavin/dev/chop/src/tokens.rs
