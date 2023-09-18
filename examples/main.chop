@@ -1,0 +1,27 @@
+main = proc() {
+    println("Hello World")
+
+    const pi = 3.141592 // testing a comments
+
+    const name = "Gavin"
+
+    for a in [1, 2, 3, 4, 5, 6] {
+        if a.is_even() {
+            println(a)
+        }
+    }
+
+    const negative = -7700
+
+    const diff = 9000 - 7700
+
+    diff *= 2
+}
+
+is_even = fn(a) -> a % 2 == 0
+
+ArrayList = struct<T> {
+    arr: [T]
+    len: u16
+    cap: u16
+}
