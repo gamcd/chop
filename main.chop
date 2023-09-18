@@ -1,0 +1,21 @@
+main = proc() {
+    println("Hello World")
+
+    const pi = 3.141592 // testing a meme proc
+
+    const name = "Gavin"
+
+    for a in [1, 2, 3, 4, 5, 6.700] {
+        if a.is_even() {
+            println(a)
+        }
+    }
+}
+
+is_even = fn(a) -> a % 2 == 0
+
+vec = struct<T> {
+    arr: [T]
+    len: u16
+    cap: u16
+}
