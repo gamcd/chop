@@ -1,8 +1,8 @@
-use std::fmt::format;
+use std::collections::VecDeque;
 use std::io::{BufRead, BufReader};
 use std::fs::File;
 use std::str::FromStr;
-use crate::tokens::Token;
+use crate::tokens::{TokenType, Token};
 
 pub struct Lexer {
     pub stream: Vec<Vec<u8>>,
@@ -53,29 +53,29 @@ impl Lexer {
         }
     }
 
-    pub(crate) fn lex(mut self) -> (Vec<(Token, usize, usize)>, Vec<String>) {
+    pub(crate) fn lex(mut self) -> (VecDeque<Token>, Vec<String>) {
         let mut error_list: Vec<String> = Vec::new();
-        let mut token_list: Vec<(Token, usize, usize)> = Vec::new();
+        let mut token_list: Vec<Token> = Vec::new();
 
         while let Some(c) = self.next() {
 
             match self.match_chars(c) {
                 Ok(t) =>
-                    token_list.push((t, self.line, self.column)),
+                    token_list.push(Token::new(t, self.line as u32, self.column as u32)),
                 Err(e)  =>
                     error_list.push(e.to_owned())
             }
         }
-        token_list.push((Token::EOF, self.line, self.column));
+        token_list.push((Token::new(TokenType::EOF, self.line as u32, self.column as u32)));
 
-        return (token_list, error_list)
+        return (token_list.into(), error_list)
     }
 
-    fn match_chars(&mut self, c: char) -> Result<Token, String> {
+    fn match_chars(&mut self, c: char) -> Result<TokenType, String> {
 
         match c {
-            '\n' => return Ok(Token::Newline),
-            '\'' => return Ok(Token::SingleQuote),
+            '\n' => return Ok(TokenType::Newline),
+            '\'' => return Ok(TokenType::SingleQuote),
             '\"' => {
                 let mut s = c.to_string();
                 while let Some(new_char) = self.next() {
@@ -86,38 +86,38 @@ impl Lexer {
                     }
                 }
 
-                return Ok(Token::StringLit(s))
+                return Ok(TokenType::StringLit(s))
             },
-            '\\' => return Ok(Token::Delim),
-            '(' => return Ok(Token::LParen),
-            ')' => return Ok(Token::RParen),
-            '[' => return Ok(Token::RBracket),
-            ']' => return Ok(Token::LBracket),
-            ':' => return Ok(Token::Colon),
-            ';' => return Ok(Token::SemiColon),
-            ',' => return Ok(Token::Comma),
-            '.' => return Ok(Token::Dot),
-            '<' => return Ok(Token::LT),
-            '>' => return Ok(Token::GT),
-            '@' => return Ok(Token::At),
-            '_' => return Ok(Token::Underscore),
-            '?' => return Ok(Token::Question),
-            '{' => {self.depth += 1; return Ok(Token::LBrace)},
-            '}' => {self.depth -= 1; return Ok(Token::RBrace)},
-            '!' => { if let Some('=') = self.peek() {self.column += 1; Ok(Token::BangEq)} else {Ok(Token::Bang)}},
-            '%' => { if let Some('=') = self.peek() {self.column += 1; Ok(Token::PercentEq)} else {Ok(Token::Percent)}},
-            '+' => { if let Some('=') = self.peek() {self.column += 1; Ok(Token::PlusEq)} else {Ok(Token::Plus)}},
-            '*' => { if let Some('=') = self.peek() {self.column += 1; Ok(Token::StarEq)} else {Ok(Token::Star)}},
-            '=' => { if let Some('=') = self.peek() {self.column += 1; Ok(Token::EqualsEq)} else {Ok(Token::Equals)}},
+            '\\' => return Ok(TokenType::Delim),
+            '(' => return Ok(TokenType::LParen),
+            ')' => return Ok(TokenType::RParen),
+            '[' => return Ok(TokenType::RBracket),
+            ']' => return Ok(TokenType::LBracket),
+            ':' => return Ok(TokenType::Colon),
+            ';' => return Ok(TokenType::SemiColon),
+            ',' => return Ok(TokenType::Comma),
+            '.' => return Ok(TokenType::Dot),
+            '<' => return Ok(TokenType::LT),
+            '>' => return Ok(TokenType::GT),
+            '@' => return Ok(TokenType::At),
+            '_' => return Ok(TokenType::Underscore),
+            '?' => return Ok(TokenType::Question),
+            '{' => {self.depth += 1; return Ok(TokenType::LBrace)},
+            '}' => {self.depth -= 1; return Ok(TokenType::RBrace)},
+            '!' => { if let Some('=') = self.peek() {self.column += 1; Ok(TokenType::BangEq)} else {Ok(TokenType::Bang)}},
+            '%' => { if let Some('=') = self.peek() {self.column += 1; Ok(TokenType::PercentEq)} else {Ok(TokenType::Percent)}},
+            '+' => { if let Some('=') = self.peek() {self.column += 1; Ok(TokenType::PlusEq)} else {Ok(TokenType::Plus)}},
+            '*' => { if let Some('=') = self.peek() {self.column += 1; Ok(TokenType::StarEq)} else {Ok(TokenType::Star)}},
+            '=' => { if let Some('=') = self.peek() {self.column += 1; Ok(TokenType::EqualsEq)} else {Ok(TokenType::Equals)}},
             '/' => { match self.peek() {
-                Some('/') => {self.line += 1; self.column = 0; Ok(Token::Newline)},
-                Some('=') => {self.next(); Ok(Token::SlashEq)}
-                _ => {Ok(Token::Slash)}
+                Some('/') => {self.line += 1; self.column = 0; Ok(TokenType::Newline)},
+                Some('=') => {self.next(); Ok(TokenType::SlashEq)}
+                _ => {Ok(TokenType::Slash)}
             }},
             '-' => {match self.peek() {
-                Some('>') => {self.next(); Ok(Token::Arrow)}
-                Some('=') => {self.next(); Ok(Token::MinusEq)}
-                _ => {Ok(Token::Minus)}
+                Some('>') => {self.next(); Ok(TokenType::Arrow)}
+                Some('=') => {self.next(); Ok(TokenType::MinusEq)}
+                _ => {Ok(TokenType::Minus)}
             }},
             'a'..='z' | 'A'..='Z' => {
                 let mut ident = c.to_string();
@@ -135,10 +135,7 @@ impl Lexer {
                     }
                 }
 
-                return Ok(match Token::from_str(&ident) {
-                    Ok(t) => t,
-                    Err(s) => Token::Ident(s)
-                });
+                Ok(TokenType::from_str(&ident).unwrap())
 
             },
             '0'..='9' => {
@@ -168,20 +165,20 @@ impl Lexer {
 
                 if floating {
                     if let Ok(n) = num_lit.parse::<f64>() {
-                        Ok(Token::FloatLit(n))
+                        Ok(TokenType::FloatLit(Box::new(n)))
                     } else {
                         Err(format!("Cannot parse Float Literal {}:{}", self.line, self.column))
                     }
                 } else {
                     if let Ok(n) = num_lit.parse::<i64>() {
-                        Ok(Token::IntLit(n))
+                        Ok(TokenType::IntLit(Box::new(n)))
                     } else {
                         Err(format!("Cannot parse Int Literal {}:{}", self.line, self.column))
                     }
                 }
             },
 
-            ' ' => {Ok(Token::WhiteSpace)},
+            ' ' => {Ok(TokenType::WhiteSpace)},
 
             _ => return Err(format!("Unexpected atom: {} {}:{}", c, self.line, self.column))
         }

@@ -1,7 +1,11 @@
 use std::str::FromStr;
 
+enum TokenSpec {
+
+}
+
 #[derive(Debug, Clone)]
-pub enum Token {
+pub enum TokenType {
     KwFn,
     KwProc,
     KwStruct,
@@ -18,7 +22,6 @@ pub enum Token {
     KwVar,
     KwAnd,
     KwOr,
-    KwAdd,
     KwTrue,
     KwFalse,
 
@@ -39,7 +42,6 @@ pub enum Token {
     Underscore,
     Question,
     SingleQuote,
-    DoubleQuote,
     Delim,
 
     Bang,       BangEq,
@@ -54,35 +56,52 @@ pub enum Token {
     EOF,
     WhiteSpace,
     Ident(String),
-    IntLit(i64),
-    FloatLit(f64),
+    IntLit(Box<i64>),
+    FloatLit(Box<f64>),
     StringLit(String),
 }
 
-impl FromStr for Token {
-    type Err = String;
+#[derive(Debug, Clone)]
+pub(crate) struct Token {
+    token_type: TokenType,
+    line: u32,
+    col: u32,
+}
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+impl Token {
+    pub fn new(token_type: TokenType, line: u32, col: u32) -> Self {
+        return Token {
+            token_type,
+            line,
+            col
+        }
+    }
+}
+
+impl FromStr for TokenType {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, ()> {
         match s {
-            "fn" => Ok(Token::KwFn),
-            "proc" => Ok(Token::KwProc),
-            "struct" => Ok(Token::KwStruct),
-            "union" => Ok(Token::KwUnion),
-            "typeclass" => Ok(Token::KwTypeclass),
-            "if" => Ok(Token::KwIf),
-            "is" => Ok(Token::KwIs),
-            "in" => Ok(Token::KwIn),
-            "with" => Ok(Token::KwWith),
-            "for" => Ok(Token::KwFor),
-            "while" => Ok(Token::KwWhile),
-            "null" => Ok(Token::KwNull),
-            "const" => Ok(Token::KwConst),
-            "var" => Ok(Token::KwVar),
-            "and" => Ok(Token::KwAnd),
-            "or" => Ok(Token::KwOr),
-            "true" => Ok(Token::KwTrue),
-            "false" => Ok(Token::KwFalse),
-            _ => Err(s.to_string())
+            "fn" => Ok(TokenType::KwFn),
+            "proc" => Ok(TokenType::KwProc),
+            "struct" => Ok(TokenType::KwStruct),
+            "union" => Ok(TokenType::KwUnion),
+            "typeclass" => Ok(TokenType::KwTypeclass),
+            "if" => Ok(TokenType::KwIf),
+            "is" => Ok(TokenType::KwIs),
+            "in" => Ok(TokenType::KwIn),
+            "with" => Ok(TokenType::KwWith),
+            "for" => Ok(TokenType::KwFor),
+            "while" => Ok(TokenType::KwWhile),
+            "null" => Ok(TokenType::KwNull),
+            "const" => Ok(TokenType::KwConst),
+            "var" => Ok(TokenType::KwVar),
+            "and" => Ok(TokenType::KwAnd),
+            "or" => Ok(TokenType::KwOr),
+            "true" => Ok(TokenType::KwTrue),
+            "false" => Ok(TokenType::KwFalse),
+            _ => Ok(TokenType::Ident(s.to_string()))
         }
     }
 }

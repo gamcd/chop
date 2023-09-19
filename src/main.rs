@@ -1,7 +1,10 @@
-
+use std::collections::VecDeque;
+use crate::parser::Parser;
+use crate::tokens::Token;
 
 mod tokens;
 mod lexer;
+mod parser;
 
 fn main() {
 
@@ -9,14 +12,14 @@ fn main() {
     let file = std::fs::File::open("./examples/main.chop").expect("File Open Error");
 
     let lexer = lexer::Lexer::new(file);
-    let (res, errors) = lexer.lex();
+    let (token_stream, error_list) = lexer.lex();
 
-    res.iter().for_each(|tok| {
-        dbg!(tok);
-    });
+    if !error_list.is_empty() {
+        for x in error_list {
+            panic!(x)
+        }
+    }
 
-    errors.iter().for_each(|err| {
-        println!("{}", err);
-    })
+    let parser = Parser::new(token_stream);
 
 }
