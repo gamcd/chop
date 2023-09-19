@@ -1,9 +1,5 @@
 use std::str::FromStr;
 
-enum TokenSpec {
-
-}
-
 #[derive(Debug, Clone)]
 pub enum TokenType {
     KwFn,
