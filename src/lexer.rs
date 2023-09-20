@@ -125,7 +125,7 @@ impl Lexer {
                 while let Some(new_char) = self.next() {
                     match new_char {
                         'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '-' => { ident.push(new_char) }
-                        ' ' | '\n' | '(' | ')' | '.' | '{' | '}' | ':' | '<' | '>' | '[' | ']' => {
+                        ' ' | '\n' | '(' | ')' | '.' | ',' | '{' | '}' | ':' | '<' | '>' | '[' | ']' => {
                             if self.column != 0 {
                                 self.column -= 1;
                             }
