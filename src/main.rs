@@ -5,6 +5,7 @@ use crate::tokens::Token;
 mod tokens;
 mod lexer;
 mod parser;
+mod abstract_syntax_tree;
 
 fn main() {
 
