@@ -1,4 +1,4 @@
-main = proc() {
+proc main = () {
     println("Hello World")
 
     const pi = 3.141592 // testing a comments
@@ -18,9 +18,10 @@ main = proc() {
     diff *= 2
 }
 
-is_even = fn(a) -> a % 2 == 0
+fn is_even = (a) -> a % 2 == 0
 
-ArrayList = struct<T> {
+struct ArrayList = {
+    T:  type
     arr: [T]
     len: u16
     cap: u16

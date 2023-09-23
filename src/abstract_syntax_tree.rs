@@ -8,26 +8,30 @@ pub enum Domain {
     Struct,
     Union,
     Typeclass,
-    Type
+    Type,
 }
 
 
 pub struct Arg(Name, Option<TypeExpr>);
 
 pub struct Signature {args: Vec<Arg>, return_type: Option<TypeExpr> }
-impl Signature {
-    fn type_signature(&self) -> Vec<Option<TypeExpr>> {
-        self.args.iter().map(|&s| s.1).collect()
-    }
+
+pub enum Literal {
+    Int(i64),
+    Float(f64),
+    List(Vec<Expr>),
+    Set(Vec<Expr>),
+    Map(Vec<(Expr, Expr)>),
+    Null
 }
 
-
-pub struct Fn(Signature, Expr);
+pub struct Fn(Signature, Box<Expr>);
 pub struct Proc(Signature, Vec<Statement>);
 
 pub enum Expr {
-    Function(Fn, Vec<Expr>),
-    Value(Value),
+    FunctionCall(Fn, Vec<Expr>),
+    Literal(Literal),
+    Reference(Name),
     Grouping,
 }
 
@@ -43,7 +47,6 @@ pub enum Value {
     P(Proc),
     E(Expr),
     T(TypeExpr),
-    R(Name)
 }
 
 

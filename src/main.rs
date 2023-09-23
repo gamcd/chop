@@ -1,6 +1,4 @@
-use std::collections::VecDeque;
 use crate::parser::Parser;
-use crate::tokens::Token;
 
 mod tokens;
 mod lexer;
@@ -17,10 +15,11 @@ fn main() {
 
     if !error_list.is_empty() {
         for x in error_list {
-            panic!(x)
+            panic!("{}", x);
         }
     }
 
     let parser = Parser::new(token_stream);
+
 
 }
