@@ -21,8 +21,8 @@ proc main = () {
 fn is_even = (a) -> a % 2 == 0
 
 struct ArrayList = {
-    T:  type
-    arr: [T]
-    len: u16
+    T:  type,
+    arr: [T],
+    len: u16,
     cap: u16
 }

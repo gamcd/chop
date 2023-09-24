@@ -20,6 +20,7 @@ fn main() {
     }
 
     let parser = Parser::new(token_stream);
+    dbg!("{:?}", parser);
 
 
 }

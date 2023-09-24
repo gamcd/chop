@@ -1,4 +1,5 @@
-use crate::tokens::Token;
+use crate::parser::{Parse, Parser};
+use crate::tokens::{Token, TokenType};
 
 pub enum Domain {
     Const,
@@ -6,7 +7,7 @@ pub enum Domain {
     Proc,
     Fn,
     Struct,
-    Union,
+    Enum,
     Typeclass,
     Type,
 }
@@ -16,12 +17,18 @@ pub struct Arg(Name, Option<TypeExpr>);
 
 pub struct Signature {args: Vec<Arg>, return_type: Option<TypeExpr> }
 
-pub enum Literal {
+
+pub struct Literal {
+    grouping: Option<Token>,
+}
+pub enum ExprLiteral {
     Int(i64),
     Float(f64),
     List(Vec<Expr>),
     Set(Vec<Expr>),
     Map(Vec<(Expr, Expr)>),
+    Tuple(Vec<Expr>),
+    StructInitialization(Vec<Field, Expr>),
     Null
 }
 
@@ -42,6 +49,14 @@ pub enum TypeExpr {
 }
 
 pub struct Name(String);
+impl Parse for Name {
+    fn parse<T>(p: &mut Parser) -> T {
+        let &&tok = p.view().next().expect("Early end of file");
+        tok.as_name()?
+    }
+
+}
+pub struct Field(String);
 pub enum Value {
     F(Fn),
     P(Proc),

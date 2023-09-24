@@ -1,11 +1,14 @@
 use std::str::FromStr;
+use crate::abstract_syntax_tree::{Domain, Name};
 
+#[repr(u8)]
 #[derive(Debug, Clone)]
 pub enum TokenType {
     KwFn,
     KwProc,
     KwStruct,
-    KwUnion,
+    KwEnum,
+    KwType,
     KwTypeclass,
     KwIf,
     KwIs,
@@ -58,19 +61,74 @@ pub enum TokenType {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Token {
+pub struct Token {
     token_type: TokenType,
     line: u32,
-    col: u32,
+    col: u16,
 }
 
 impl Token {
-    pub fn new(token_type: TokenType, line: u32, col: u32) -> Self {
+    pub fn new(token_type: TokenType, line: u32, col: u16) -> Self {
         return Token {
             token_type,
             line,
             col
         }
+    }
+
+    pub fn as_domain(&self) -> Option<Domain> {
+        match self.token_type {
+            TokenType::KwConst => Some(Domain::Const),
+            TokenType::KwVar => Some(Domain::Var),
+            TokenType::KwFn => Some(Domain::Fn),
+            TokenType::KwProc => Some(Domain::Proc),
+            TokenType::KwStruct => Some(Domain::Struct),
+            TokenType::KwEnum => Some(Domain::Enum),
+            TokenType::KwType => Some(Domain::Type),
+            TokenType::KwTypeclass => Some(Domain::Typeclass),
+            _ => None,
+        }
+    }
+
+    pub fn as_name(&self) -> Option<Name> {
+        if let TokenType::Ident(s ) = &self.token_type {
+            Some(Name(s.to_string()))
+        } else {
+            None
+        }
+    }
+
+    pub fn as_keyword(&self) -> Option<TokenType> {
+        let tt: u8 = &self.token_type as u8;
+        match tt {
+            tt if (TokenType::KwFn as u8..=TokenType::KwFalse).contains(&tt) => Some(TokenType::try_from(tt).unwrap()),
+            _ => None
+        }
+
+        /*
+        match self.token_type {
+            TokenType::KwFn => Some(TokenType::KwFn),
+            TokenType::KwProc => Some(TokenType::KwProc),
+            TokenType::KwStruct => Some(TokenType::KwStruct),
+            TokenType::KwEnum => Some(TokenType::KwEnum),
+            TokenType::KwType => Some(TokenType::KwType),
+            TokenType::KwTypeclass => Some(TokenType::KwTypeclass),
+            TokenType::KwIf => Some(TokenType::KwIf),
+            TokenType::KwIs => Some(TokenType::KwIs),
+            TokenType::KwWith => Some(TokenType::KwWith),
+            TokenType::KwIn => Some(TokenType::KwIn),
+            TokenType::KwFor => Some(TokenType::KwFor),
+            TokenType::KwWhile => Some(TokenType::KwWhile),
+            TokenType::KwNull => Some(TokenType::KwNull),
+            TokenType::KwConst => Some(TokenType::KwConst),
+            TokenType::KwVar => Some(TokenType::KwVar),
+            TokenType::KwAnd => Some(TokenType::KwAnd),
+            TokenType::KwOr => Some(TokenType::KwOr),
+            TokenType::KwTrue => Some(TokenType::KwTrue),
+            TokenType::KwFalse => Some(TokenType::KwFalse),
+            _ => None
+        }
+        */
     }
 }
 
@@ -82,7 +140,8 @@ impl FromStr for TokenType {
             "fn" => Ok(TokenType::KwFn),
             "proc" => Ok(TokenType::KwProc),
             "struct" => Ok(TokenType::KwStruct),
-            "union" => Ok(TokenType::KwUnion),
+            "union" => Ok(TokenType::KwEnum),
+            "type" => Ok(TokenType::KwType),
             "typeclass" => Ok(TokenType::KwTypeclass),
             "if" => Ok(TokenType::KwIf),
             "is" => Ok(TokenType::KwIs),

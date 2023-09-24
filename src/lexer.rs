@@ -59,14 +59,16 @@ impl Lexer {
 
         while let Some(c) = self.next() {
 
+            let col = self.column as u16;
+            let line = self.line as u32;
             match self.match_chars(c) {
                 Ok(t) =>
-                    token_list.push(Token::new(t, self.line as u32, self.column as u32)),
+                    token_list.push(Token::new(t, line, col)),
                 Err(e)  =>
                     error_list.push(e.to_owned())
             }
         }
-        token_list.push((Token::new(TokenType::EOF, self.line as u32, self.column as u32)));
+        token_list.push((Token::new(TokenType::EOF, self.line as u32, self.column as u16)));
 
         return (token_list.into(), error_list)
     }
@@ -178,7 +180,7 @@ impl Lexer {
                 }
             },
 
-            ' ' => {Ok(TokenType::WhiteSpace)},
+            c if c.is_ascii_whitespace() => {Ok(TokenType::WhiteSpace)},
 
             _ => return Err(format!("Unexpected atom: {} {}:{}", c, self.line, self.column))
         }
