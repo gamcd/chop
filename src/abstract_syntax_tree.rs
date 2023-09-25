@@ -1,5 +1,4 @@
-use crate::parser::{Parse, Parser};
-use crate::tokens::{Token, TokenType};
+use crate::tokens::{Token};
 
 pub enum Domain {
     Const,
@@ -11,7 +10,6 @@ pub enum Domain {
     Typeclass,
     Type,
 }
-
 
 pub struct Arg(Name, Option<TypeExpr>);
 
@@ -28,7 +26,7 @@ pub enum ExprLiteral {
     Set(Vec<Expr>),
     Map(Vec<(Expr, Expr)>),
     Tuple(Vec<Expr>),
-    StructInitialization(Vec<Field, Expr>),
+    StructInitialization(Vec<(Field, Expr)>),
     Null
 }
 
@@ -36,7 +34,8 @@ pub struct Fn(Signature, Box<Expr>);
 pub struct Proc(Signature, Vec<Statement>);
 
 pub enum Expr {
-    FunctionCall(Fn, Vec<Expr>),
+    FunctionCall(Fn, Vec<Arg>),
+    ProcCall(Proc, Vec<Arg>),
     Literal(Literal),
     Reference(Name),
     Grouping,
@@ -48,15 +47,9 @@ pub enum TypeExpr {
     Grouping,
 }
 
-pub struct Name(String);
-impl Parse for Name {
-    fn parse<T>(p: &mut Parser) -> T {
-        let &&tok = p.view().next().expect("Early end of file");
-        tok.as_name()?
-    }
-
-}
-pub struct Field(String);
+pub struct Name(pub String);
+pub struct Field(pub String);
+pub struct TypeAnnotation(pub Option<TypeExpr>);
 pub enum Value {
     F(Fn),
     P(Proc),
@@ -66,6 +59,11 @@ pub enum Value {
 
 
 pub enum Statement {
-    Initialization(Domain, Name, Option<TypeExpr>, Value),
-    ProcCall(Name, Vec<Value>),
+    Initialization(Domain, Name, TypeAnnotation, Value),
+    ProcCall(LineStatement),
+}
+
+pub struct LineStatement {
+    proc_name: Name,
+    args: Vec<Arg>,
 }

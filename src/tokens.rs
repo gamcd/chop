@@ -62,17 +62,18 @@ pub enum TokenType {
 
 #[derive(Debug, Clone)]
 pub struct Token {
-    token_type: TokenType,
-    line: u32,
-    col: u16,
+    pub token_type: TokenType,
+    pub position: Position,
 }
+
+#[derive(Copy, Clone, Debug)]
+pub struct Position(u32, u16);
 
 impl Token {
     pub fn new(token_type: TokenType, line: u32, col: u16) -> Self {
         return Token {
             token_type,
-            line,
-            col
+            position: Position(line, col),
         }
     }
 
@@ -99,13 +100,6 @@ impl Token {
     }
 
     pub fn as_keyword(&self) -> Option<TokenType> {
-        let tt: u8 = &self.token_type as u8;
-        match tt {
-            tt if (TokenType::KwFn as u8..=TokenType::KwFalse).contains(&tt) => Some(TokenType::try_from(tt).unwrap()),
-            _ => None
-        }
-
-        /*
         match self.token_type {
             TokenType::KwFn => Some(TokenType::KwFn),
             TokenType::KwProc => Some(TokenType::KwProc),
@@ -128,7 +122,6 @@ impl Token {
             TokenType::KwFalse => Some(TokenType::KwFalse),
             _ => None
         }
-        */
     }
 }
 
