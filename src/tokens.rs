@@ -1,8 +1,8 @@
 use std::str::FromStr;
-use crate::abstract_syntax_tree::{Domain, Name};
+use crate::abstract_syntax_tree::{Name, Domain};
 
 #[repr(u8)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TokenType {
     KwFn,
     KwProc,
@@ -11,10 +11,12 @@ pub enum TokenType {
     KwType,
     KwTypeclass,
     KwIf,
+    KwElse,
     KwIs,
-    KwWith,
     KwIn,
     KwFor,
+    KwReturn,
+    KwWith,
     KwWhile,
     KwNull,
     KwConst,
@@ -43,17 +45,18 @@ pub enum TokenType {
     SingleQuote,
     Delim,
 
+    Equals,     EqualsEq,
     Bang,       BangEq,
     Percent,    PercentEq,
-    Plus,       PlusEq,
-    Minus,      MinusEq,
-    Arrow,
     Star,       StarEq,
     Slash,      SlashEq,
-    Equals,     EqualsEq,
+    Plus,       PlusEq,
+    Minus,      MinusEq,
+    Negate,
+    Arrow,
 
     EOF,
-    WhiteSpace,
+    Whitespace,
     Ident(String),
     IntLit(Box<i64>),
     FloatLit(Box<f64>),
@@ -66,14 +69,50 @@ pub struct Token {
     pub position: Position,
 }
 
+
 #[derive(Copy, Clone, Debug)]
-pub struct Position(u32, u16);
+pub struct Position(pub u32, pub u16);
+
+impl Position {
+    pub fn part_of_line(&self, t: &Token) -> Result<(), ()> {
+        return match (*t).token_type {
+            TokenType::RParen | TokenType::RBracket | TokenType::RBrace => {
+                if self.1 <= t.position.1 {
+                    Ok(())
+                } else {
+                    Err(())
+                }
+            },
+            _ => {
+                if self.1 < t.position.1 {
+                    Ok(())
+                } else {
+                    Err(())
+                }
+            }
+        }
+    }
+}
 
 impl Token {
     pub fn new(token_type: TokenType, line: u32, col: u16) -> Self {
         return Token {
             token_type,
             position: Position(line, col),
+        }
+    }
+
+    pub fn is_domain(&self) -> bool {
+        match self.token_type {
+            TokenType::KwConst |
+            TokenType::KwVar |
+            TokenType::KwFn |
+            TokenType::KwProc |
+            TokenType::KwStruct |
+            TokenType::KwEnum |
+            TokenType::KwType |
+            TokenType::KwTypeclass => true,
+            _ => false
         }
     }
 
@@ -84,10 +123,10 @@ impl Token {
             TokenType::KwFn => Some(Domain::Fn),
             TokenType::KwProc => Some(Domain::Proc),
             TokenType::KwStruct => Some(Domain::Struct),
-            TokenType::KwEnum => Some(Domain::Enum),
+            TokenType::KwEnum => Some(Domain:: Enum),
             TokenType::KwType => Some(Domain::Type),
             TokenType::KwTypeclass => Some(Domain::Typeclass),
-            _ => None,
+            _ => None
         }
     }
 
@@ -98,6 +137,7 @@ impl Token {
             None
         }
     }
+
 
     pub fn as_keyword(&self) -> Option<TokenType> {
         match self.token_type {
@@ -123,6 +163,30 @@ impl Token {
             _ => None
         }
     }
+
+    pub fn bp(&self, expr_type: ExprType) -> Option<(u8, u8)> {
+        todo!();
+        /*
+        match expr_type {
+            ExprType::TypeExpr => {
+                match self.token_type {
+                }
+            },
+            ExprType::PureExpr => {
+
+            },
+            ExprType::LineExpr => {
+
+            },
+        }
+        */
+    }
+}
+
+pub enum ExprType {
+    TypeExpr,
+    PureExpr,
+    LineExpr,
 }
 
 impl FromStr for TokenType {

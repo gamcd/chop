@@ -1,28 +1,37 @@
-proc main = () {
+proc main = () -> () {
     println("Hello World")
 
     const pi = 3.141592 // testing a comments
 
-    const name = "Gavin"
-
-    for a in [1, 2, 3, 4, 5, 6] {
-        if a.is_even() {
-            println(a)
-        }
-    }
-
-    const negative = -7700
-
-    const diff = 9000 - 7700
-
-    diff *= 2
+    const list = ArrayList.init()
 }
+
+fn fibonacci = (n where n < 1) -> 1
+fn fibonacci = (1) -> 1
+fn fibonacci = (n) -> fibonacci(n - 1) + fibonacci(n - 2)
 
 fn is_even = (a) -> a % 2 == 0
 
 struct ArrayList = {
-    T:  type,
-    arr: [T],
-    len: u16,
-    cap: u16
+    type T
+    var arr: [T]
+    var len: u16
+    var cap: u16
+
+    typeclass @init = {
+        fn init = (T) {
+            return Arraylist {
+
+            }
+
+        }
+    }
+
+    typeclass @len = {
+        fn len = self -> self.len
+    }
+}
+
+enum option = {
+
 }

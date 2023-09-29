@@ -1,55 +1,104 @@
 use std::collections::vec_deque::Iter;
 use std::collections::VecDeque;
-use crate::abstract_syntax_tree::{Field, LineStatement, Name, Statement, TypeAnnotation, TypeExpr, Value};
+use crate::abstract_syntax_tree::{Statement, Name, Line, TypeAnnotation, TypeExpr, Expr, Value, FnDec, ProcDec, Struct, Enum, EnumEntry, Typeclass, Domain, Initialization};
 use crate::tokens::{Position, Token, TokenType};
 
 #[derive(Debug)]
 pub struct Parser {
     token_stream: VecDeque<Token>,
     error_stream: VecDeque<Token>,
+    expected_domain: Option<Domain>,
+    indent: Position,
 }
 
 impl Parser {
-    pub fn view(&self) -> Iter<&Token> {
-        self.into()
+    pub fn view(&self) -> View {
+        View(self.token_stream.iter())
     }
 
-    fn next(&mut self) -> Option<&Token> {
-        self.token_stream.front()
+    fn next(&mut self) -> Option<Token> {
+        return match self.indent.part_of_line(self.token_stream.front().expect("Early End of file")) {
+            Ok(_) => {
+                self.token_stream.pop_front()
+            },
+            Err(_) => {
+                self.expected_domain = None;
+                Some(Token::new(TokenType::Newline, self.indent.0, 0))
+            }
+        }
     }
 
+    fn yank(&mut self) -> Token { self.token_stream.pop_front().expect("Early end of file") }
     pub fn new(token_stream: VecDeque<Token>) -> Self {
         Parser {
             token_stream,
             error_stream: VecDeque::new(),
+            expected_domain: None,
+            indent: Position(0, 0),
         }
     }
 
     fn skip(&mut self, n: u8) {
         for _ in 0..n {
-            self.next()
+            self.next();
         }
     }
 
-    fn skip_every(&mut self, token_type: TokenType) {
-        for &&a in self.view() {
-            if a.token_type != token_type {break}
-            self.next()
+    fn parse_list<T: Parse>(&mut self, separator: TokenType, left: TokenType, right: TokenType) -> Result<Vec<T>, ParseError> {
+        let first = self.yank();
+        if let &right = &first.token_type {
+            let mut list = Vec::new();
+            loop {
+                let preceding = self.yank();
+                match preceding.token_type {
+                    right => return Ok(list),
+                    _ => {
+                        list.push(T::parse(self)?);
+                        if separator == TokenType::Newline {
+                            self.indent = Position(self.indent.0 + 1, 0);
+                        }
+                        let next = self.yank();
+                        match next.token_type {
+                            separator => {},
+                            right => return Ok(list),
+                            _ => return Err(ParseError::new(format!("Unexpected token '{:?}', expected '{:?}' | '{:?}'", &first, &separator, &right), [preceding.yank().position, preceding.yank().position]))
+                        }
+                    }
+                }
+            }
+        } else {
+            return Err(ParseError::new(format!("Unexpected first Grouping '{:?}', expected {:?}", &first,  &left), [first.position, first.position]));
         }
     }
 }
+
+pub struct View<'a>(Iter<'a, Token>);
+impl View<'_> {
+    fn yank(&mut self) -> &Token {
+        self.0.next().expect("Early end of file")
+    }
+}
+fn yank(next_token: Option<&Token>) -> &Token {
+   next_token.expect("Early end of file")
+}
+
+fn yank_owned(next_token: Option<Token>) -> Token {
+    next_token.expect("Early end of file")
+}
+
+
 
 pub trait Parse {
-    fn parse<T>(p: &mut Parser) -> Result<T, ParseError>;
+    fn parse(p: &mut Parser) -> Result<Self, ParseError> where Self: Sized;
 }
 
-struct ParseError {
+pub struct ParseError {
     message: String,
     err_range: [Position; 2]
 }
 
 impl ParseError {
-    fn new(message: String, err_range: [Position; 2]) -> Self {
+    pub fn new(message: String, err_range: [Position; 2]) -> Self {
         ParseError {
             message,
             err_range,
@@ -63,69 +112,95 @@ impl ParseError {
 //  Parse implementations for AST types
 //
 
-fn yank(next_token: Option<Token>) -> Token {
-    next_token.expect("Early end of file")
+
+
+impl Parse for Line {
+    fn parse(p: &mut Parser) -> Result<Self, ParseError> {
+        let mut view = p.view();
+        let tok = view.yank();
+
+        return if tok.is_domain() {
+            Ok(Line::Initialization(Initialization::parse(p)?))
+        } else {
+            Ok(Line::Statement(Statement::parse(p)?))
+        }
+    }
 }
 
+impl Parse for Initialization {
+    fn parse(p: &mut Parser) -> Result<Self, ParseError> {
+        p.indent = yank(p.token_stream.front()).position;
+        let domain = Domain::parse(p)?;
+        p.expected_domain = Some(domain);
+        let name = Name::parse(p)?;
+        if let Domain::Type = domain {
+            return Ok(Initialization { domain, name, type_annotation: TypeAnnotation(None), value: Value::Type(TypeAnnotation::parse(p)?) });
+        }
+        let type_annotation = TypeAnnotation::parse(p)?;
 
-impl Parse for Statement {
-    fn parse<Statement>(p: &mut Parser) -> Result<Statement, ParseError> {
-        let mut view = p.view();
-        let tok = yank(**view.next());
-
-        if let Some(domain) = tok.as_domain() {
-            Statement::Initialization(domain, Name::parse(p), Field::parse(p), Value::parse(p))
+        let equals = p.yank();
+        if let TokenType::Equals = equals.token_type {}
+        else {
+            return Err(ParseError::new(format!("Expected '=', found {:?}", equals.token_type), [equals.position, equals.position]))
         }
 
-        Statement::ProcCall(LineStatement::parse(p))
+        Ok(Initialization {
+            domain,
+            name,
+            type_annotation,
+            value: Value::parse(p)?,
+        })
+
+    }
+}
+
+impl Parse for Statement {
+    fn parse(p: &mut Parser) -> Result<Statement, ParseError> {
+        let mut view = p.view();
+        p.indent = view.yank().position;
+
+        todo!();
+    }
+}
+
+
+impl Parse for Domain {
+    fn parse(p: &mut Parser) -> Result<Self, ParseError> {
+        Ok(p.yank().as_domain().unwrap())
     }
 }
 
 
 
-impl Parse for LineStatement {
-    fn parse<LineStatement>(p: &mut Parser) -> Result<LineStatement, ParseError> {
-        todo!()
-    }
-}
 
 impl Parse for Name {
-    fn parse<Name>(p: &mut Parser) -> Result<Name, ParseError>{
+    fn parse(p: &mut Parser) -> Result<Self, ParseError>{
         let mut view = p.view();
-        let tok = yank(**view.next());
+        let tok = view.yank();
 
-        tok.as_name().ok_or(ParseError::new(
-            format!("Expected Identifier, found \'{:?}\'", tok.token_type),
-            [tok.position, view.next().expect("Early end of file").position]
-        ))
+        return match tok.as_name() {
+            Some(n) => Ok(n),
+            None => Err(ParseError::new(format!("Expected Identifier, found \'{:?}\'", tok.token_type), [tok.position, view.yank().position])),
+        };
+
     }
 
 }
 
 impl Parse for TypeAnnotation {
-    fn parse<TypeAnnotation>(p: &mut Parser) -> Result<TypeAnnotation, ParseError> {
+    fn parse(p: &mut Parser) -> Result<Self, ParseError> {
 
         let mut view = p.view();
-        let first = yank(**view.nth(0));
-        let second = yank(**view.nth(1));
+        let first = yank(view.0.nth(0));
+        let second = yank(view.0.nth(1));
 
         return match first.token_type {
-            TokenType::WhiteSpace => {
-                return match second.token_type {
-                    TokenType::Comma => {
-                        p.skip(1);
-                        Ok(TypeAnnotation(None))
-                    },
-                    TokenType::Equals | TokenType::WhiteSpace => {
-                        p.skip(2);
-                        Ok(TypeAnnotation(None))
-                    },
-                    _ => {Err(ParseError::new(format!("Unexpected token '{:?}'", second.token_type), [second.position, second.position]))},
-                }
+            TokenType::Equals | TokenType::LBrace | TokenType::Comma | TokenType::Newline => {
+                Ok(TypeAnnotation(None))
             },
             TokenType::Colon => {
                 p.skip(1);
-                Ok(TypeExpr::parse(p)?)
+                Ok(TypeAnnotation(Some(TypeExpr::parse(p)?)))
             },
             _ => {
                 Err(ParseError::new(format!("Unexpected token '{:?}'", second.token_type), [second.position, second.position]))
@@ -135,14 +210,70 @@ impl Parse for TypeAnnotation {
     }
 }
 
-impl Parse for Value {
-    fn parse<Value>(p: &mut Parser) -> Result<Value, ParseError> {
-        let mut view = p.view();
 
-        loop {
-            let tok = yank(**view.next());
+//
+// Value Parser implementations
+//
+
+impl Parse for Value {
+    fn parse(p: &mut Parser) -> Result<Self, ParseError> {
+        let mut view = p.view();
+        if let Some(d) = &p.expected_domain  {
+            match d {
+                &Domain::Struct => return Ok(Value::Struct(Struct::parse(p)?)),
+                &Domain::Enum => return Ok(Value::Enum(Enum::parse(p)?)),
+                &Domain::Typeclass => return Ok(Value::Typeclass(Typeclass::parse(p)?)),
+                _ => {},
+            }
         }
 
+        return Ok(Value::Expr(Expr::parse(p)?));
+    }
+
+}
+
+impl Parse for Expr {
+    fn parse(p: &mut Parser) -> Result<Self, ParseError> {
+        todo!();
+    }
+}
+impl Parse for ProcDec {
+    fn parse(p: &mut Parser) -> Result<Self, ParseError> {
+        todo!()
+    }
+}
+impl Parse for FnDec {
+    fn parse(p: &mut Parser) -> Result<Self, ParseError> {
+        todo!()
+    }
+}
+
+impl Parse for Struct {
+    fn parse(p: &mut Parser) -> Result<Self, ParseError> {
+        todo!()
+    }
+}
+
+impl Parse for Enum {
+    fn parse(p: &mut Parser) -> Result<Self, ParseError> {
+        Ok(Enum(p.parse_list(TokenType::Newline, TokenType::LBrace, TokenType::RBrace)?))
+    }
+}
+
+impl Parse for EnumEntry {
+    fn parse(p: &mut Parser) -> Result<Self, ParseError> {
+        todo!()
+    }
+}
+
+impl Parse for Typeclass {
+    fn parse(p: &mut Parser) -> Result<Self, ParseError> {
+        todo!()
+    }
+}
+
+impl Parse for TypeExpr {
+    fn parse(p: &mut Parser) -> Result<Self, ParseError> {
         todo!()
     }
 }

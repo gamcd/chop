@@ -1,4 +1,4 @@
-use crate::parser::Parser;
+use crate::parser::{Parse, Parser};
 
 mod tokens;
 mod lexer;
@@ -15,12 +15,11 @@ fn main() {
 
     if !error_list.is_empty() {
         for x in error_list {
-            panic!("{}", x);
+            dbg!("{}", x);
         }
     }
 
-    let parser = Parser::new(token_stream);
-    dbg!("{:?}", parser);
-
+    dbg!(&token_stream);
+    let mut parser = Parser::new(token_stream);
 
 }

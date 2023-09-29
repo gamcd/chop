@@ -1,5 +1,16 @@
-use crate::tokens::{Token};
+use crate::tokens::{Token, TokenType};
 
+pub enum Value {
+    Expr(Expr),
+    Proc(ProcDec),
+    Fn(FnDec),
+    Struct(Struct),
+    Enum(Enum),
+    Typeclass(Typeclass),
+    Type(TypeAnnotation),
+}
+
+#[derive(Clone, Copy, Debug)]
 pub enum Domain {
     Const,
     Var,
@@ -11,34 +22,38 @@ pub enum Domain {
     Type,
 }
 
-pub struct Arg(Name, Option<TypeExpr>);
+pub struct ProcDec(Signature, Vec<Line>);
+pub struct FnDec(Signature, Box<Expr>);
+pub struct Struct(pub Vec<Line>);
+pub struct Enum(pub Vec<EnumEntry>);
+pub struct EnumEntry(Field, Option<Vec<TypeExpr>>);
 
-pub struct Signature {args: Vec<Arg>, return_type: Option<TypeExpr> }
+pub struct Typeclass(Vec<Line>);
+pub struct Name(pub String);
+pub struct Arg(Name, TypeAnnotation);
+
+pub struct Signature {args: Vec<Arg>, return_type: TypeAnnotation }
 
 
-pub struct Literal {
-    grouping: Option<Token>,
-}
-pub enum ExprLiteral {
+pub enum Literal {
     Int(i64),
     Float(f64),
     List(Vec<Expr>),
     Set(Vec<Expr>),
     Map(Vec<(Expr, Expr)>),
     Tuple(Vec<Expr>),
-    StructInitialization(Vec<(Field, Expr)>),
+    StructInitialization(Vec<Expr>),
+    Closure(Box<Value>),
     Null
 }
 
-pub struct Fn(Signature, Box<Expr>);
-pub struct Proc(Signature, Vec<Statement>);
 
 pub enum Expr {
-    FunctionCall(Fn, Vec<Arg>),
-    ProcCall(Proc, Vec<Arg>),
+    Call(Name, Vec<Arg>),
     Literal(Literal),
     Reference(Name),
-    Grouping,
+    FieldAccess(Box<Expr>, Field),
+    Grouping(TokenType, Box<Expr>),
 }
 
 pub enum TypeExpr {
@@ -47,23 +62,24 @@ pub enum TypeExpr {
     Grouping,
 }
 
-pub struct Name(pub String);
-pub struct Field(pub String);
+pub struct Field {
+        pub field_name: String,
+}
 pub struct TypeAnnotation(pub Option<TypeExpr>);
-pub enum Value {
-    F(Fn),
-    P(Proc),
-    E(Expr),
-    T(TypeExpr),
+
+pub struct Initialization {
+    pub domain: Domain,
+    pub name: Name,
+    pub type_annotation: TypeAnnotation,
+    pub value: Value,
 }
 
-
-pub enum Statement {
-    Initialization(Domain, Name, TypeAnnotation, Value),
-    ProcCall(LineStatement),
+pub enum Line {
+    Initialization(Initialization),
+    Statement(Statement)
 }
 
-pub struct LineStatement {
+pub struct Statement {
     proc_name: Name,
     args: Vec<Arg>,
 }

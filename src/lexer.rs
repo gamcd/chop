@@ -8,7 +8,6 @@ pub struct Lexer {
     pub stream: Vec<Vec<u8>>,
     line: usize,
     column: usize,
-    depth: u8
 }
 
 
@@ -23,7 +22,6 @@ impl Lexer {
             stream: lines,
             line: 0,
             column: 0,
-            depth: 0,
         }
     }
 
@@ -62,13 +60,16 @@ impl Lexer {
             let col = self.column as u16;
             let line = self.line as u32;
             match self.match_chars(c) {
-                Ok(t) =>
-                    token_list.push(Token::new(t, line, col)),
+                Ok(t) => {
+                    if t != TokenType::Whitespace {
+                        token_list.push(Token::new(t, line, col))
+                    }
+                },
                 Err(e)  =>
                     error_list.push(e.to_owned())
             }
         }
-        token_list.push((Token::new(TokenType::EOF, self.line as u32, self.column as u16)));
+        token_list.push(Token::new(TokenType::EOF, self.line as u32, self.column as u16));
 
         return (token_list.into(), error_list)
     }
@@ -104,22 +105,24 @@ impl Lexer {
             '@' => return Ok(TokenType::At),
             '_' => return Ok(TokenType::Underscore),
             '?' => return Ok(TokenType::Question),
-            '{' => {self.depth += 1; return Ok(TokenType::LBrace)},
-            '}' => {self.depth -= 1; return Ok(TokenType::RBrace)},
-            '!' => { if let Some('=') = self.peek() {self.column += 1; Ok(TokenType::BangEq)} else {Ok(TokenType::Bang)}},
-            '%' => { if let Some('=') = self.peek() {self.column += 1; Ok(TokenType::PercentEq)} else {Ok(TokenType::Percent)}},
-            '+' => { if let Some('=') = self.peek() {self.column += 1; Ok(TokenType::PlusEq)} else {Ok(TokenType::Plus)}},
-            '*' => { if let Some('=') = self.peek() {self.column += 1; Ok(TokenType::StarEq)} else {Ok(TokenType::Star)}},
-            '=' => { if let Some('=') = self.peek() {self.column += 1; Ok(TokenType::EqualsEq)} else {Ok(TokenType::Equals)}},
+            '{' => return Ok(TokenType::LBrace),
+            '}' => return Ok(TokenType::RBrace),
+            '!' => if let Some('=') = self.peek() {self.column += 1; Ok(TokenType::BangEq)} else {Ok(TokenType::Bang)},
+            '%' => if let Some('=') = self.peek() {self.column += 1; Ok(TokenType::PercentEq)} else {Ok(TokenType::Percent)},
+            '+' => if let Some('=') = self.peek() {self.column += 1; Ok(TokenType::PlusEq)} else {Ok(TokenType::Plus)},
+            '*' => if let Some('=') = self.peek() {self.column += 1; Ok(TokenType::StarEq)} else {Ok(TokenType::Star)},
+            '=' => if let Some('=') = self.peek() {self.column += 1; Ok(TokenType::EqualsEq)} else {Ok(TokenType::Equals)},
             '/' => { match self.peek() {
                 Some('/') => {self.line += 1; self.column = 0; Ok(TokenType::Newline)},
                 Some('=') => {self.next(); Ok(TokenType::SlashEq)}
                 _ => {Ok(TokenType::Slash)}
             }},
-            '-' => {match self.peek() {
-                Some('>') => {self.next(); Ok(TokenType::Arrow)}
-                Some('=') => {self.next(); Ok(TokenType::MinusEq)}
-                _ => {Ok(TokenType::Minus)}
+            '-' => {match self.peek().expect("Early end of File") {
+                'a'..='z' | 'A'..='Z' | '0'..='9' => Ok(TokenType::Negate),
+                '>' => {self.next(); Ok(TokenType::Arrow)},
+                '=' => {self.next(); Ok(TokenType::MinusEq)},
+                ' ' => {Ok(TokenType::Minus)},
+                _ => Err(format!("Unexpected character {}:{}", self.line, self.column)),
             }},
             'a'..='z' | 'A'..='Z' => {
                 let mut ident = c.to_string();
@@ -127,13 +130,13 @@ impl Lexer {
                 while let Some(new_char) = self.next() {
                     match new_char {
                         'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '-' => { ident.push(new_char) }
-                        ' ' | '\n' | '(' | ')' | '.' | ',' | '{' | '}' | ':' | '<' | '>' | '[' | ']' => {
+                        ' ' | '\n' | '(' | ')' | '.' | ',' | '{' | '}' | ':' | '<' | '>' | '[' | ']' | '@' => {
                             if self.column != 0 {
                                 self.column -= 1;
                             }
                             break;
                         },
-                        _ => { return Err(format!("Illegal Identifier character: \'{}\'", &new_char)); }
+                        _ => { return Err(format!("Illegal Identifier character: \'{}\'    {}:{}", &new_char, self.line, self.column)); },
                     }
                 }
 
@@ -180,7 +183,7 @@ impl Lexer {
                 }
             },
 
-            c if c.is_ascii_whitespace() => {Ok(TokenType::WhiteSpace)},
+            c if c.is_ascii_whitespace() => {Ok(TokenType::Whitespace)},
 
             _ => return Err(format!("Unexpected atom: {} {}:{}", c, self.line, self.column))
         }
