@@ -46,29 +46,20 @@ impl Parser {
 
     fn parse_list<T: Parse>(&mut self, separator: TokenType, left: TokenType, right: TokenType) -> Result<Vec<T>, ParseError> {
         let first = self.yank();
-        if let &right = &first.token_type {
+        if let left = first.token_type {
             let mut list = Vec::new();
             loop {
-                let preceding = self.yank();
-                match preceding.token_type {
-                    right => return Ok(list),
-                    _ => {
-                        list.push(T::parse(self)?);
-                        if separator == TokenType::Newline {
-                            self.indent = Position(self.indent.0 + 1, 0);
-                        }
-                        let next = self.yank();
-                        match next.token_type {
-                            separator => {},
-                            right => return Ok(list),
-                            _ => return Err(ParseError::new(format!("Unexpected token '{:?}', expected '{:?}' | '{:?}'", &first, &separator, &right), [preceding.yank().position, preceding.yank().position]))
-                        }
+                list.push(T::parse(self)?);
+                let next = self.yank();
+                if let right = next.token_type { return Ok(list); }
+                if let separator = next.token_type {
+                    if separator == TokenType::Newline {
+                        self.indent = Position(self.indent.0 + 1, 0)
                     }
                 }
             }
-        } else {
-            return Err(ParseError::new(format!("Unexpected first Grouping '{:?}', expected {:?}", &first,  &left), [first.position, first.position]));
         }
+        return Err(ParseError::new(format!("Unexpected first Grouping '{:?}', expected {:?}", &first,  &left), [first.position, first.position]));
     }
 }
 

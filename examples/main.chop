@@ -1,4 +1,4 @@
-proc main = () -> () {
+proc main = () {
     println("Hello World")
 
     const pi = 3.141592 // testing a comments
@@ -18,20 +18,14 @@ struct ArrayList = {
     var len: u16
     var cap: u16
 
-    typeclass @init = {
-        fn init = (T) {
-            return Arraylist {
-
-            }
-
-        }
-    }
+    fn new = () -> ArrayList(u8) { T, arr: [], len: 0, cap: 0 }
 
     typeclass @len = {
         fn len = self -> self.len
     }
 }
 
-enum option = {
-
+enum option = (type T) {
+    some(T)
+    null
 }
