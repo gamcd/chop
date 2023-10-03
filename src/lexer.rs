@@ -97,7 +97,7 @@ impl Lexer {
             '[' => return Ok(TokenType::RBracket),
             ']' => return Ok(TokenType::LBracket),
             ':' => return Ok(TokenType::Colon),
-            ';' => return Ok(TokenType::SemiColon),
+            ';' => return Ok(TokenType::Newline),
             ',' => return Ok(TokenType::Comma),
             '.' => return Ok(TokenType::Dot),
             '<' => return Ok(TokenType::LT),

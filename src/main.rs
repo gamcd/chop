@@ -4,6 +4,7 @@ mod tokens;
 mod lexer;
 mod parser;
 mod abstract_syntax_tree;
+mod operator;
 
 fn main() {
 

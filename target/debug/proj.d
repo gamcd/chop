@@ -1,0 +1,1 @@
+/home/gavin/Dev/chop/target/debug/proj: /home/gavin/Dev/chop/src/abstract_syntax_tree.rs /home/gavin/Dev/chop/src/lexer.rs /home/gavin/Dev/chop/src/main.rs /home/gavin/Dev/chop/src/operator.rs /home/gavin/Dev/chop/src/parser.rs /home/gavin/Dev/chop/src/tokens.rs

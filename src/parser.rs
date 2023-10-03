@@ -1,6 +1,7 @@
 use std::collections::vec_deque::Iter;
 use std::collections::VecDeque;
-use crate::abstract_syntax_tree::{Statement, Name, Line, TypeAnnotation, TypeExpr, Expr, Value, FnDec, ProcDec, Struct, Enum, EnumEntry, Typeclass, Domain, Initialization};
+use crate::operator::{bp, LineOperator};
+use crate::abstract_syntax_tree::{Statement, Name, Line, TypeAnnotation, TypeExpr, Expr, Value, Struct, Enum, EnumEntry, Typeclass, Domain, Initialization};
 use crate::tokens::{Position, Token, TokenType};
 
 #[derive(Debug)]
@@ -12,12 +13,13 @@ pub struct Parser {
 }
 
 impl Parser {
+
     pub fn view(&self) -> View {
         View(self.token_stream.iter())
     }
 
     fn next(&mut self) -> Option<Token> {
-        return match self.indent.part_of_line(self.token_stream.front().expect("Early End of file")) {
+        return match self.indent.includes(self.token_stream.front().expect("Early End of file")) {
             Ok(_) => {
                 self.token_stream.pop_front()
             },
@@ -28,7 +30,20 @@ impl Parser {
         }
     }
 
-    fn yank(&mut self) -> Token { self.token_stream.pop_front().expect("Early end of file") }
+    fn peek(&mut self) -> Token {
+        return match self.indent.includes(self.token_stream.front().expect("Early End of file")) {
+            Ok(_) => {
+                self.token_stream.front().expect("Early end of File").clone()
+            },
+            Err(_) => {
+                self.expected_domain = None;
+                Token::new(TokenType::Newline, self.indent.0, 0)
+            }
+        }
+    }
+
+    fn yank(&mut self) -> Token { self.next().expect("Early end of file") }
+
     pub fn new(token_stream: VecDeque<Token>) -> Self {
         Parser {
             token_stream,
@@ -46,20 +61,31 @@ impl Parser {
 
     fn parse_list<T: Parse>(&mut self, separator: TokenType, left: TokenType, right: TokenType) -> Result<Vec<T>, ParseError> {
         let first = self.yank();
-        if let left = first.token_type {
-            let mut list = Vec::new();
-            loop {
-                list.push(T::parse(self)?);
-                let next = self.yank();
-                if let right = next.token_type { return Ok(list); }
-                if let separator = next.token_type {
-                    if separator == TokenType::Newline {
-                        self.indent = Position(self.indent.0 + 1, 0)
-                    }
-                }
+        if right == first.token_type {
+            return Err(ParseError::new(format!("Unexpected first Grouping '{:?}', expected {:?}", &first,  &left), [first.position, first.position]));
+        }
+
+        let mut list = Vec::new();
+        loop {
+            let element = self.yank();
+            if element.token_type == right {
+                return Ok(list);
+            }
+            list.push(T::parse(self)?);
+            if separator == TokenType::Newline {
+                self.indent = Position(self.indent.0 + 1, 0);
+            }
+            let next = self.yank();
+            match next.token_type {
+                separator => {},
+                right => return Ok(list),
+                _ => return Err(ParseError::new(format!("Unexpected token '{:?}', expected '{:?}' | '{:?}'", &first, &separator, &right), [element.position, element.position]))
             }
         }
-        return Err(ParseError::new(format!("Unexpected first Grouping '{:?}', expected {:?}", &first,  &left), [first.position, first.position]));
+    }
+
+    fn ast_build(&mut self) -> Vec<Statement> {
+        todo!()
     }
 }
 
@@ -120,16 +146,22 @@ impl Parse for Line {
 
 impl Parse for Initialization {
     fn parse(p: &mut Parser) -> Result<Self, ParseError> {
-        p.indent = yank(p.token_stream.front()).position;
+        p.indent = p.peek().position;
+
         let domain = Domain::parse(p)?;
+
         p.expected_domain = Some(domain);
+
         let name = Name::parse(p)?;
+
         if let Domain::Type = domain {
             return Ok(Initialization { domain, name, type_annotation: TypeAnnotation(None), value: Value::Type(TypeAnnotation::parse(p)?) });
         }
+
         let type_annotation = TypeAnnotation::parse(p)?;
 
         let equals = p.yank();
+
         if let TokenType::Equals = equals.token_type {}
         else {
             return Err(ParseError::new(format!("Expected '=', found {:?}", equals.token_type), [equals.position, equals.position]))
@@ -147,10 +179,7 @@ impl Parse for Initialization {
 
 impl Parse for Statement {
     fn parse(p: &mut Parser) -> Result<Statement, ParseError> {
-        let mut view = p.view();
-        p.indent = view.yank().position;
-
-        todo!();
+        todo!()
     }
 }
 
@@ -171,7 +200,7 @@ impl Parse for Name {
 
         return match tok.as_name() {
             Some(n) => Ok(n),
-            None => Err(ParseError::new(format!("Expected Identifier, found \'{:?}\'", tok.token_type), [tok.position, view.yank().position])),
+            None => Err(ParseError::new(format!("Expected Identifier, found '{:?}\'", tok.token_type), [tok.position, view.yank().position])),
         };
 
     }
@@ -227,27 +256,26 @@ impl Parse for Expr {
     fn parse(p: &mut Parser) -> Result<Self, ParseError> {
         todo!();
     }
+
 }
-impl Parse for ProcDec {
-    fn parse(p: &mut Parser) -> Result<Self, ParseError> {
-        todo!()
-    }
-}
-impl Parse for FnDec {
-    fn parse(p: &mut Parser) -> Result<Self, ParseError> {
-        todo!()
-    }
+
+fn parse_bp<T: bp>(p: &mut Parser, min_bp: u8) -> Result<T, ParseError> {
+    todo!()
 }
 
 impl Parse for Struct {
     fn parse(p: &mut Parser) -> Result<Self, ParseError> {
-        todo!()
+        Ok(Struct(
+            p.parse_list(TokenType::Newline, TokenType::LBrace, TokenType::RBrace)?
+        ))
     }
 }
 
 impl Parse for Enum {
     fn parse(p: &mut Parser) -> Result<Self, ParseError> {
-        Ok(Enum(p.parse_list(TokenType::Newline, TokenType::LBrace, TokenType::RBrace)?))
+        Ok(Enum(
+            p.parse_list(TokenType::Newline, TokenType::LBrace, TokenType::RBrace)?
+        ))
     }
 }
 
@@ -259,7 +287,7 @@ impl Parse for EnumEntry {
 
 impl Parse for Typeclass {
     fn parse(p: &mut Parser) -> Result<Self, ParseError> {
-        todo!()
+        Ok(Typeclass(p.parse_list(TokenType::Newline, TokenType::LBrace, TokenType::RBrace)?))
     }
 }
 

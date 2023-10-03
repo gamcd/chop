@@ -4,6 +4,8 @@ use crate::abstract_syntax_tree::{Name, Domain};
 #[repr(u8)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenType {
+    KwConst,
+    KwVar,
     KwFn,
     KwProc,
     KwStruct,
@@ -12,15 +14,13 @@ pub enum TokenType {
     KwTypeclass,
     KwIf,
     KwElse,
-    KwIs,
+    //KwIs,
     KwIn,
     KwFor,
     KwReturn,
-    KwWith,
+    KwBreak,
     KwWhile,
     KwNull,
-    KwConst,
-    KwVar,
     KwAnd,
     KwOr,
     KwTrue,
@@ -38,7 +38,6 @@ pub enum TokenType {
     RBracket,
     LParen,
     RParen,
-    SemiColon,
     Colon,
     Underscore,
     Question,
@@ -74,8 +73,8 @@ pub struct Token {
 pub struct Position(pub u32, pub u16);
 
 impl Position {
-    pub fn part_of_line(&self, t: &Token) -> Result<(), ()> {
-        return match (*t).token_type {
+    pub fn includes(&self, t: &Token) -> Result<(), ()> {
+        return match t.token_type {
             TokenType::RParen | TokenType::RBracket | TokenType::RBrace => {
                 if self.1 <= t.position.1 {
                     Ok(())
@@ -130,6 +129,7 @@ impl Token {
         }
     }
 
+
     pub fn as_name(&self) -> Option<Name> {
         if let TokenType::Ident(s ) = &self.token_type {
             Some(Name(s.to_string()))
@@ -139,6 +139,7 @@ impl Token {
     }
 
 
+    /*
     pub fn as_keyword(&self) -> Option<TokenType> {
         match self.token_type {
             TokenType::KwFn => Some(TokenType::KwFn),
@@ -163,24 +164,8 @@ impl Token {
             _ => None
         }
     }
+    */
 
-    pub fn bp(&self, expr_type: ExprType) -> Option<(u8, u8)> {
-        todo!();
-        /*
-        match expr_type {
-            ExprType::TypeExpr => {
-                match self.token_type {
-                }
-            },
-            ExprType::PureExpr => {
-
-            },
-            ExprType::LineExpr => {
-
-            },
-        }
-        */
-    }
 }
 
 pub enum ExprType {
@@ -194,26 +179,28 @@ impl FromStr for TokenType {
 
     fn from_str(s: &str) -> Result<Self, ()> {
         match s {
+            "const" => Ok(TokenType::KwConst),
+            "var" => Ok(TokenType::KwVar),
             "fn" => Ok(TokenType::KwFn),
             "proc" => Ok(TokenType::KwProc),
             "struct" => Ok(TokenType::KwStruct),
-            "union" => Ok(TokenType::KwEnum),
+            "enum" => Ok(TokenType::KwEnum),
             "type" => Ok(TokenType::KwType),
             "typeclass" => Ok(TokenType::KwTypeclass),
             "if" => Ok(TokenType::KwIf),
-            "is" => Ok(TokenType::KwIs),
+            "else" => Ok(TokenType::KwElse),
+            //"is" => Ok(TokenType::KwIs),
             "in" => Ok(TokenType::KwIn),
-            "with" => Ok(TokenType::KwWith),
             "for" => Ok(TokenType::KwFor),
+            "return" => Ok(TokenType::KwReturn),
+            "break" => Ok(TokenType::KwBreak),
             "while" => Ok(TokenType::KwWhile),
             "null" => Ok(TokenType::KwNull),
-            "const" => Ok(TokenType::KwConst),
-            "var" => Ok(TokenType::KwVar),
             "and" => Ok(TokenType::KwAnd),
             "or" => Ok(TokenType::KwOr),
             "true" => Ok(TokenType::KwTrue),
             "false" => Ok(TokenType::KwFalse),
-            _ => Ok(TokenType::Ident(s.to_string()))
+            _ => Err(())
         }
     }
 }

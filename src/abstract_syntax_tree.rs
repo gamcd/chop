@@ -2,8 +2,6 @@ use crate::tokens::{Token, TokenType};
 
 pub enum Value {
     Expr(Expr),
-    Proc(ProcDec),
-    Fn(FnDec),
     Struct(Struct),
     Enum(Enum),
     Typeclass(Typeclass),
@@ -22,13 +20,11 @@ pub enum Domain {
     Type,
 }
 
-pub struct ProcDec(Signature, Vec<Line>);
-pub struct FnDec(Signature, Box<Expr>);
 pub struct Struct(pub Vec<Line>);
 pub struct Enum(pub Vec<EnumEntry>);
 pub struct EnumEntry(Field, Option<Vec<TypeExpr>>);
 
-pub struct Typeclass(Vec<Line>);
+pub struct Typeclass(pub Vec<Line>);
 pub struct Name(pub String);
 pub struct Arg(Name, TypeAnnotation);
 
@@ -38,6 +34,7 @@ pub struct Signature {args: Vec<Arg>, return_type: TypeAnnotation }
 pub enum Literal {
     Int(i64),
     Float(f64),
+    Bool(bool),
     List(Vec<Expr>),
     Set(Vec<Expr>),
     Map(Vec<(Expr, Expr)>),
