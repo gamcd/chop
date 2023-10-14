@@ -1,3 +1,4 @@
+use crate::parser::Parse;
 use crate::tokens::{Token, TokenType};
 
 pub enum Value {
@@ -26,12 +27,17 @@ pub struct EnumEntry(Field, Option<Vec<TypeExpr>>);
 
 pub struct Typeclass(pub Vec<Line>);
 pub struct Name(pub String);
-pub struct Arg(Name, TypeAnnotation);
 
-pub struct Signature {args: Vec<Arg>, return_type: TypeAnnotation }
+pub struct Signature {
+    args: Vec<Tag<Name, TypeExpr>>,
+    return_type: TypeAnnotation,
+}
 
+pub struct Tag<T: Parse, U: Parse>(pub T, pub Option<U>);
 
 pub enum Literal {
+    Null,
+    Void,
     Int(i64),
     Float(f64),
     Bool(bool),
@@ -39,14 +45,13 @@ pub enum Literal {
     Set(Vec<Expr>),
     Map(Vec<(Expr, Expr)>),
     Tuple(Vec<Expr>),
-    StructInitialization(Vec<Expr>),
+    StructInitialization(Name, Vec<Expr>),
     Closure(Box<Value>),
-    Null
 }
 
-
 pub enum Expr {
-    Call(Name, Vec<Arg>),
+    Sequence(Vec<Expr>),
+    Call(Name, Vec<Expr>),
     Literal(Literal),
     Reference(Name),
     FieldAccess(Box<Expr>, Field),
@@ -60,7 +65,7 @@ pub enum TypeExpr {
 }
 
 pub struct Field {
-        pub field_name: String,
+    pub field_name: String,
 }
 pub struct TypeAnnotation(pub Option<TypeExpr>);
 
@@ -73,10 +78,19 @@ pub struct Initialization {
 
 pub enum Line {
     Initialization(Initialization),
-    Statement(Statement)
+    Statement(Statement),
+    Return(Expr),
+    For(ForStatement),
+    While(Conditional),
+    If(Conditional),
+    Break,
+    Continue,
 }
+
+pub struct Conditional(pub Expr, pub Vec<Line>, pub Option<Vec<Line>>);
+pub struct ForStatement(pub Vec<Name>, pub Expr, pub Vec<Line>);
 
 pub struct Statement {
     proc_name: Name,
-    args: Vec<Arg>,
+    args: Vec<Expr>,
 }
