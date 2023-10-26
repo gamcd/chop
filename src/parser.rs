@@ -1,11 +1,12 @@
+use std::slice::Iter;
+use std::collections::VecDeque;
+
 use crate::abstract_syntax_tree::{
     Conditional, Domain, Enum, EnumEntry, Expr, ForStatement, Initialization, Line, Literal, Name,
     Statement, Struct, Tag, TypeAnnotation, TypeExpr, Typeclass, Value,
 };
-use crate::operator::{bp, ExprOperator, LineOperator, BP};
+use crate::operator::{ExprOperator, BP};
 use crate::tokens::{Position, Token, TokenType};
-use std::collections::vec_deque::Iter;
-use std::collections::VecDeque;
 
 #[derive(Debug)]
 pub struct Parser {
@@ -16,10 +17,6 @@ pub struct Parser {
 }
 
 impl Parser {
-    pub fn view(&self) -> View {
-        View(self.token_stream.iter())
-    }
-
     fn next(&mut self) -> Option<Token> {
         return match self
             .indent
@@ -82,7 +79,7 @@ impl Parser {
                     "Unexpected first Grouping '{:?}', expected {:?}",
                     &first, &left
                 ),
-                [first.position, first.position],
+                first.position
             ));
         }
 
@@ -106,7 +103,7 @@ impl Parser {
                             "Unexpected token '{:?}', expected '{:?}' | '{:?}'",
                             &first, &separator, &right
                         ),
-                        [element.position, element.position],
+                        element.position
                     ))
                 }
             }
@@ -131,12 +128,6 @@ impl Parser {
     }
 }
 
-pub struct View<'a>(Iter<'a, Token>);
-impl View<'_> {
-    fn yank(&mut self) -> &Token {
-        self.0.next().expect("Early end of file")
-    }
-}
 fn yank(next_token: Option<&Token>) -> &Token {
     next_token.expect("Early end of file")
 }
@@ -159,12 +150,12 @@ pub trait ParseBP {
 
 pub struct ParseError {
     message: String,
-    err_range: [Position; 2],
+    position: Position,
 }
 
 impl ParseError {
-    pub fn new(message: String, err_range: [Position; 2]) -> Self {
-        ParseError { message, err_range }
+    pub fn new(message: String, position: Position) -> Self {
+        ParseError { message, position }
     }
 }
 
@@ -174,8 +165,7 @@ impl ParseError {
 
 impl Parse for Line {
     fn parse(p: &mut Parser) -> Result<Self, ParseError> {
-        let mut view = p.view();
-        let tok = view.yank();
+        let tok = yank(p.token_stream.front());
 
         if tok.is_domain() {
             return Ok(Line::Initialization(Initialization::parse(p)?));
@@ -185,9 +175,9 @@ impl Parse for Line {
             TokenType::KwFor => Ok(Line::For(ForStatement::parse(p)?)),
             TokenType::KwIf => Ok(Line::If(Conditional::parse(p)?)),
             TokenType::KwWhile => Ok(Line::While(Conditional::parse(p)?)),
-            TokenType::KwReturn => Ok(Line::Return(Expr::parse(p)?)),
-            TokenType::KwBreak => Ok(Line::Break),
-            TokenType::KwContinue => Ok(Line::Continue),
+            TokenType::KwReturn => {p.yank(); Ok(Line::Return(Expr::parse(p)?))},
+            TokenType::KwBreak => {p.yank(); Ok(Line::Break)},
+            TokenType::KwContinue => {p.yank(); Ok(Line::Continue)},
             _ => Ok(Line::parse(p)?),
         };
     }
@@ -245,7 +235,7 @@ impl Parse for Initialization {
         } else {
             return Err(ParseError::new(
                 format!("Expected '=', found {:?}", equals.token_type),
-                [equals.position, equals.position],
+                equals.position
             ));
         }
 
@@ -272,14 +262,13 @@ impl Parse for Domain {
 
 impl Parse for Name {
     fn parse(p: &mut Parser) -> Result<Self, ParseError> {
-        let mut view = p.view();
-        let tok = view.yank();
+        let tok = yank(p.token_stream.front());
 
         return match tok.as_name() {
             Some(n) => Ok(n),
             None => Err(ParseError::new(
                 format!("Expected Identifier, found '{:?}\'", tok.token_type),
-                [tok.position, view.yank().position],
+                tok.position,
             )),
         };
     }
@@ -294,9 +283,8 @@ impl<T: Parse, U: Parse> Parse for Tag<T, U> {
 
 impl Parse for TypeAnnotation {
     fn parse(p: &mut Parser) -> Result<Self, ParseError> {
-        let mut view = p.view();
-        let first = view.yank();
-        let second = view.yank();
+        let first = yank(p.token_stream.front());
+        let second = yank(p.token_stream.get(1));
 
         return match first.token_type {
             TokenType::Equals | TokenType::LBrace | TokenType::Comma | TokenType::Newline => {
@@ -308,7 +296,7 @@ impl Parse for TypeAnnotation {
             }
             _ => Err(ParseError::new(
                 format!("Unexpected token '{:?}'", second.token_type),
-                [second.position, second.position],
+                second.position
             )),
         };
     }
@@ -320,7 +308,6 @@ impl Parse for TypeAnnotation {
 
 impl Parse for Value {
     fn parse(p: &mut Parser) -> Result<Self, ParseError> {
-        let mut view = p.view();
         if let Some(d) = &p.expected_domain {
             match d {
                 &Domain::Struct => return Ok(Value::Struct(Struct::parse(p)?)),
@@ -342,34 +329,91 @@ impl Parse for Expr {
 
 impl ParseBP for Expr {
     fn parse_bp(p: &mut Parser, min_bp: u8) -> Result<Self, ParseError> {
-        let mut view = p.view();
-        let first = view.yank();
+        let first = p.yank();
 
-        let lhs: Expr = if let Some(bp) = ExprOperator::prefix_bp(first.token_type) {
-            match p.yank().token_type {
+        let lhs: Expr = if let Some(bp) = ExprOperator::prefix_bp(&first.token_type) {
+            match first.token_type {
                 TokenType::LParen => {
-                    let mut rtn;
                     if p.peek().token_type == TokenType::RParen {
                         p.next();
-                        rtn = Expr::Literal(Literal::Void)
+                        Expr::Literal(Literal::Void)
+                    } else {
+                        let inside = Expr::parse_bp(p, bp)?;
+                        match inside {
+                            Expr::Sequence(s) => Expr::Literal(Literal::Tuple(s)),
+                            e => e,
+                        }
                     }
-                    let inside = Expr::parse_bp(p, bp);
-
-                    rtn
                 }
+
+                TokenType::LBrace => {
+                    let elements = p.parse_list::<Tag<Expr, Expr>>(
+                        TokenType::Comma,
+                        TokenType::LBrace,
+                        TokenType::RBrace,
+                    )?;
+                    let mut err = "";
+                    if elements[0].1.is_some() {
+                        let mut map = Vec::new();
+                        for e in elements {
+                            if let Some(v) = e.1 {
+                                map.push((e.0, v))
+                            } else {
+                                err = "Expected map entry, found set entry";
+                                break;
+                            }
+                        }
+
+                        if err != "" {
+                            return Err(ParseError::new(err.to_string(), first.position));
+                        }
+
+                        Expr::Literal(Literal::Map(map))
+                    } else {
+                        let mut set = Vec::new();
+                        for e in elements {
+                            if e.1.is_none() {
+                                set.push(e.0);
+                            } else {
+                                err = "Expected set entry, found map entry";
+                                break;
+                            }
+                        }
+
+                        if err != "" {
+                            return Err(ParseError::new(err.to_string(), first.position));
+                        }
+
+                        Expr::Literal(Literal::Set(set))
+                    }
+                }
+
+                TokenType::LBracket => {
+                    let list =
+                        p.parse_list(TokenType::Comma, TokenType::LBracket, TokenType::RBracket)?;
+                    Expr::Literal(Literal::List(list))
+                }
+
                 TokenType::Bang => {
                     Expr::Call(Name(String::from("not")), vec![Expr::parse_bp(p, bp)?])
                 }
+
                 _ => Expr::Call(Name(String::from("negate")), vec![Expr::parse_bp(p, bp)?]),
             }
         } else {
-            match first.token_type {
-                TokenType::Ident(s) => Expr::Reference(Name(s)),
+            match &first.token_type {
+                TokenType::Ident(s) => Expr::Reference(Name(s.to_string())),
                 TokenType::KwNull => Expr::Literal(Literal::Null),
                 TokenType::KwTrue => Expr::Literal(Literal::Bool(true)),
                 TokenType::KwFalse => Expr::Literal(Literal::Bool(false)),
-                TokenType::IntLit(i) => Expr::Literal(Literal::Int(i)),
-                TokenType::FloatLit(f) => Expr::Literal(Literal::Float(f)),
+                TokenType::IntLit(i) => Expr::Literal(Literal::Int(*i)),
+                TokenType::FloatLit(f) => Expr::Literal(Literal::Float(*f)),
+                _ => {
+                    return Err(ParseError::new(
+                        format!("Unexpected token {:?}, unsure what happened", first),
+                        first.position
+                    ))
+                }
             }
         };
 
